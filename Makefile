@@ -135,13 +135,16 @@ output/index.html: endless-sky.js endless-sky.html favicon.ico Ubuntu-Regular.tt
 	mv to-be-modified-endless-sky.html output/index.html
 test: output/index.html
 	cd output; emrun --serve_after_close --serve_after_exit --browser chrome --private_browsing index.html
-# Deploy to Cloudflare R2 (S3-compatible API) and purge the Cloudflare cache.
+# Deploy to Cloudflare R2 (S3-compatible API) and purge index.html from the
+# Cloudflare edge cache. Other assets are content-hashed and safe to leave
+# cached.
 # Required environment:
 #   CLOUDFLARE_ACCOUNT_ID         R2 account ID (used as the endpoint subdomain)
 #   AWS_ACCESS_KEY_ID             R2 access key
 #   AWS_SECRET_ACCESS_KEY         R2 secret access key
 #   CLOUDFLARE_API_TOKEN          API token with "Cache Purge" permission
 #   CLOUDFLARE_ZONE_ID            Zone ID for the public hostname
+#   SITE_URL                      Public origin, e.g. https://play.example.com
 #   R2_BUCKET                     R2 bucket name (default: endless-web)
 R2_BUCKET ?= endless-web
 R2_ENDPOINT = https://$(CLOUDFLARE_ACCOUNT_ID).r2.cloudflarestorage.com
@@ -151,4 +154,4 @@ deploy: output/index.html
 	curl -fsS -X POST "https://api.cloudflare.com/client/v4/zones/$(CLOUDFLARE_ZONE_ID)/purge_cache" \
 		-H "Authorization: Bearer $(CLOUDFLARE_API_TOKEN)" \
 		-H "Content-Type: application/json" \
-		--data '{"purge_everything":true}'
+		--data '{"files":["$(SITE_URL)/","$(SITE_URL)/index.html"]}'

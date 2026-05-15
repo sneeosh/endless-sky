@@ -69,5 +69,6 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          SITE_URL: ${{ secrets.SITE_URL }}
           R2_BUCKET: endless-web
         run: source emsdk/emsdk_env.sh; make deploy
