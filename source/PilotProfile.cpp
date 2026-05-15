@@ -24,6 +24,10 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "PlayerInfo.h"
 #include "UI.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 #include <cassert>
 #include <ranges>
 
@@ -185,6 +189,13 @@ void PilotProfile::DeleteProfile(const std::shared_ptr<PilotProfile> &pilot, UI 
 		auto it = ranges::find(pilots, pilot);
 		if(it != pilots.end())
 			pilots.erase(it);
+#ifdef __EMSCRIPTEN__
+		EM_ASM(
+			FS.syncfs(false, function(err) {
+				if(err) console.error('IDBFS delete error:', err);
+			});
+		);
+#endif
 	}
 	else if(ui)
 		ui->Push(DialogPanel::Info("Deleting pilot files failed."));

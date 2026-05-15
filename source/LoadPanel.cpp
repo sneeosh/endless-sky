@@ -15,6 +15,10 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "LoadPanel.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 #include "text/Alignment.h"
 #include "Color.h"
 #include "Command.h"
@@ -542,6 +546,13 @@ void LoadPanel::WriteSnapshot(const filesystem::path &sourceFile, const filesyst
 		UpdateLists();
 		selectedFile = Files::Name(snapshotName);
 		loadedInfo.Load(Files::Saves() / selectedFile);
+#ifdef __EMSCRIPTEN__
+		EM_ASM(
+			FS.syncfs(false, function(err) {
+				if(err) console.error('IDBFS snapshot error:', err);
+			});
+		);
+#endif
 	}
 	else
 		GetUI().Push(DialogPanel::Info("Error: unable to create the file \"" + snapshotName.string() + "\"."));
@@ -597,6 +608,14 @@ void LoadPanel::DeleteSave()
 	Files::Delete(path);
 	if(Files::Exists(path))
 		GetUI().Push(DialogPanel::Info("Deleting snapshot file failed."));
+#ifdef __EMSCRIPTEN__
+	else
+		EM_ASM(
+			FS.syncfs(false, function(err) {
+				if(err) console.error('IDBFS delete error:', err);
+			});
+		);
+#endif
 
 	sideHasFocus = true;
 	selectedPilot.reset();
