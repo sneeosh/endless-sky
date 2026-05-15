@@ -1,0 +1,14 @@
+name = "endless-web"
+main = "src/index.js"
+compatibility_date = "2026-05-01"
+
+# The Worker fronts the R2 bucket that `make deploy` populates and rewrites
+# request paths from `/foo` to `live/foo` (the build sync target).
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "endless-web"
+
+# Bind a custom route once the zone is wired up, e.g.:
+# routes = [
+#   { pattern = "play.example.com/*", zone_name = "example.com" },
+# ]
