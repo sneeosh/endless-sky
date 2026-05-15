@@ -135,8 +135,20 @@ output/index.html: endless-sky.js endless-sky.html favicon.ico Ubuntu-Regular.tt
 	mv to-be-modified-endless-sky.html output/index.html
 test: output/index.html
 	cd output; emrun --serve_after_close --serve_after_exit --browser chrome --private_browsing index.html
+# Deploy to Cloudflare R2 (S3-compatible API) and purge the Cloudflare cache.
+# Required environment:
+#   CLOUDFLARE_ACCOUNT_ID         R2 account ID (used as the endpoint subdomain)
+#   AWS_ACCESS_KEY_ID             R2 access key
+#   AWS_SECRET_ACCESS_KEY         R2 secret access key
+#   CLOUDFLARE_API_TOKEN          API token with "Cache Purge" permission
+#   CLOUDFLARE_ZONE_ID            Zone ID for the public hostname
+#   R2_BUCKET                     R2 bucket name (default: endless-web)
+R2_BUCKET ?= endless-web
+R2_ENDPOINT = https://$(CLOUDFLARE_ACCOUNT_ID).r2.cloudflarestorage.com
 deploy: output/index.html
-	aws s3 sync --size-only --exclude index.html output s3://play-endless-sky.com/live --cache-control 'public, max-age=604800, immutable'
-	aws s3 sync --exclude '*' --include index.html output s3://play-endless-sky.com/live --cache-control 'max-age=0'
-	aws cloudfront create-invalidation --distribution-id E2TZUW922XPLEF --paths / /index.html
-	aws cloudfront create-invalidation --distribution-id E3D0Y4DMGSVPWC --paths / /index.html
+	aws s3 sync --endpoint-url $(R2_ENDPOINT) --size-only --exclude index.html output s3://$(R2_BUCKET)/live --cache-control 'public, max-age=604800, immutable'
+	aws s3 sync --endpoint-url $(R2_ENDPOINT) --exclude '*' --include index.html output s3://$(R2_BUCKET)/live --cache-control 'max-age=0'
+	curl -fsS -X POST "https://api.cloudflare.com/client/v4/zones/$(CLOUDFLARE_ZONE_ID)/purge_cache" \
+		-H "Authorization: Bearer $(CLOUDFLARE_API_TOKEN)" \
+		-H "Content-Type: application/json" \
+		--data '{"purge_everything":true}'
