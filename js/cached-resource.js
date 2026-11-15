@@ -53,37 +53,18 @@
       this.cacheKey = key + keySuffix;
     }
     async get(length, version, progressCallback = () => {}) {
-      const cachedData = await kvstore.get(this.cacheKey);
-      const cachedVersion = await kvstore.get(this.cacheKey + "-version");
-      if (cachedData) {
-        if (version === cachedVersion) {
-          console.log(
-            "Using cached resource",
-            this.cacheKey,
-            "originally downloaded from",
-            this.resourceUrl
-          );
-          progressCallback(cachedData.byteLength, cachedData.byteLength, true);
-          console.log("cached data:", cachedData);
-          return cachedData;
-        }
-        console.log(
-          "Out of date resource",
-          this.cacheKey,
-          "so redownloading from",
-          this.resourceUrl
-        );
-        console.log(
-          "required version",
-          version,
-          "but had version",
-          cachedVersion,
-          "stored"
-        );
+      const cached = await kvstore.get(this.cacheKey);
+      if (cached && cached.version === version && cached.data instanceof ArrayBuffer &&
+          (!length || cached.data.byteLength === length)) {
+        progressCallback(cached.data.byteLength, cached.data.byteLength, true);
+        return cached.data;
       }
-      let data;
 
+      let data;
       const response = await fetch(this.resourceUrl);
+      if (!response.ok) {
+        throw new Error(`Could not download ${this.resourceUrl} (HTTP ${response.status}).`);
+      }
       const headerContentLength = parseInt(
         response.headers.get("Content-Length")
       );
@@ -99,21 +80,29 @@
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
+          if (offset + value.length > length) {
+            throw new Error(`Downloaded more than the expected ${length} bytes for ${this.resourceUrl}.`);
+          }
           view.set(value, offset);
           offset += value.length;
           progressCallback(offset, length);
         }
-        progressCallback(offset, length);
+        if (offset !== length) {
+          throw new Error(`Incomplete download of ${this.resourceUrl}: received ${offset} of ${length} bytes.`);
+        }
       } else {
         // no progress bar
         progressCallback(0, headerContentLength);
         data = await response.arrayBuffer();
+        if (length && data.byteLength !== length) {
+          throw new Error(`Expected ${length} bytes for ${this.resourceUrl}, received ${data.byteLength}.`);
+        }
       }
 
       console.log("downloaded", this.resourceUrl, data);
       try {
-        await kvstore.set(this.cacheKey, data);
-        await kvstore.set(this.cacheKey + "-version", version);
+        // Commit bytes and version together, including when two tabs load different builds.
+        await kvstore.set(this.cacheKey, {version, data});
       } catch (e) {
         console.log(
           "Failure writing to IndexedDB, maybe private browsing / incognito mode or low on disk space"
